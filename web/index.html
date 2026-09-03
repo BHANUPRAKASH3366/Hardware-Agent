@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hardware Agent — component sourcing search</title>
+<meta name="description" content="Search PCB, VLSI and embedded components across distributors and compare stock and pricing in one table.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f9d76'/%3E%3Cpath d='M10 10h12v12H10z' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='M13 6v4M19 6v4M13 22v4M19 22v4M6 13h4M6 19h4M22 13h4M22 19h4' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<a class="skip-link" href="#results-region">Skip to results</a>
+
+<header class="topbar">
+  <div class="topbar__brand">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="28" height="28">
+        <rect x="9" y="9" width="14" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="16" cy="16" r="2.4" fill="currentColor"/>
+        <path d="M13 5v4M19 5v4M13 23v4M19 23v4M5 13h4M5 19h4M23 13h4M23 19h4"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <div>
+      <h1>Hardware Agent</h1>
+      <p class="topbar__tag">Sourcing search for PCB, VLSI &amp; embedded parts</p>
+    </div>
+  </div>
+  <div class="topbar__actions">
+    <button type="button" class="pill pill--status" id="source-summary" aria-haspopup="dialog">
+      <span class="dot" id="source-dot"></span><span id="source-summary-text">Loading sources…</span>
+    </button>
+    <button type="button" class="icon-btn" id="theme-toggle" title="Switch theme" aria-label="Switch colour theme">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="currentColor"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <form class="searchbar" id="search-form" autocomplete="off">
+      <div class="searchbar__field searchbar__field--query">
+        <label for="q">Component</label>
+        <div class="input-wrap">
+          <svg class="input-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 1 1-4.9 13.2l-3.3 3.3a1 1 0 0 1-1.4-1.4l3.3-3.3A7.5 7.5 0 0 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z" fill="currentColor"/></svg>
+          <input id="q" name="q" type="search" required maxlength="120"
+                 placeholder="Part number, category or description — e.g. STM32F103C8T6, Artix-7 FPGA, 10k 0805"
+                 aria-describedby="q-hint">
+        </div>
+        <p class="hint" id="q-hint">Press <kbd>/</kbd> anywhere to jump back here.</p>
+      </div>
+
+      <div class="searchbar__field searchbar__field--qty">
+        <label for="qty">Required stock</label>
+        <input id="qty" name="qty" type="number" min="1" step="1" value="100"
+               inputmode="numeric" aria-describedby="qty-hint">
+        <p class="hint" id="qty-hint">Prices resolve to this quantity break.</p>
+      </div>
+
+      <div class="searchbar__field searchbar__field--ccy">
+        <label for="currency">Currency</label>
+        <select id="currency" name="currency"></select>
+        <p class="hint">Converted at configured rates.</p>
+      </div>
+
+      <div class="searchbar__field searchbar__field--go">
+        <button type="submit" class="btn btn--primary" id="search-btn">
+          <span class="btn__label">Search</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+
+    <div class="chips" id="examples" aria-label="Example searches">
+      <span class="chips__label">Try</span>
+      <button type="button" class="chip" data-example="STM32F103C8T6">STM32F103C8T6</button>
+      <button type="button" class="chip" data-example="ESP32 WROOM module">ESP32 module</button>
+      <button type="button" class="chip" data-example="Artix-7 FPGA">Artix-7 FPGA</button>
+      <button type="button" class="chip" data-example="LM358 op-amp">LM358 op-amp</button>
+      <button type="button" class="chip" data-example="10k resistor 0805">10k 0805 resistor</button>
+      <button type="button" class="chip" data-example="BME280 sensor">BME280 sensor</button>
+      <button type="button" class="chip" data-example="USB Type-C connector">USB-C connector</button>
+      <button type="button" class="chip chip--browse" id="browse-toggle" aria-expanded="false"
+              aria-controls="category-panel">
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Browse categories
+      </button>
+      <button type="button" class="chip chip--browse" id="photo-toggle" aria-expanded="false"
+              aria-controls="photo-panel">
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        Identify from photo
+      </button>
+      <button type="button" class="chip chip--browse" id="bom-toggle" aria-expanded="false"
+              aria-controls="bom-panel">
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12h6M9 16h6M9 8h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Price a BOM file
+      </button>
+    </div>
+
+    <div class="bom" id="bom-panel" hidden>
+      <div class="bom__head">
+        <div>
+          <h2>Price a whole bill of materials</h2>
+          <p>Upload the BOM as Excel, CSV or PDF. The agent finds the part number and
+             quantity columns, prices every line across all suppliers at once, and gives
+             you the table back as Excel.</p>
+        </div>
+      </div>
+
+      <div class="bom__grid">
+        <div class="dropzone dropzone--file" id="bom-drop" tabindex="0" role="button"
+             aria-label="Choose a bill of materials file, or drop one here">
+          <input type="file" id="bom-input" hidden
+                 accept=".xlsx,.csv,.tsv,.txt,.pdf,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <div class="dropzone__prompt" id="bom-prompt">
+            <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4M9 13h6M9 17h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <strong>Drop a BOM, or click to choose</strong>
+            <span><code>.xlsx</code>, <code>.csv</code> or <code>.pdf</code>. Title rows,
+                  designator columns and repeated part numbers are all handled.</span>
+          </div>
+        </div>
+
+        <div class="bom__side">
+          <div class="bom__file" id="bom-file" hidden></div>
+          <p class="hint" id="bom-hint">Prices resolve to the quantity in the file. Lines
+             with no quantity are priced at 1, and you can change any of them before
+             running.</p>
+          <div class="bom__actions">
+            <button type="button" class="btn btn--primary" id="bom-run" disabled>
+              <span class="btn__label">Price these parts</span>
+              <span class="spinner" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn--ghost" id="bom-clear" hidden>Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bom__out" id="bom-out"></div>
+    </div>
+
+    <div class="photo" id="photo-panel" hidden>
+      <div class="photo__head">
+        <div>
+          <h2>Identify a component from a photo</h2>
+          <p>The picture is read by a vision model running on this machine through
+             Ollama, then the part it names is priced across every supplier below.
+             Nothing is uploaded anywhere.</p>
+        </div>
+        <button type="button" class="pill pill--status" id="vision-pill" title="Local model status">
+          <span class="dot" id="vision-dot"></span><span id="vision-pill-text">Checking…</span>
+        </button>
+      </div>
+
+      <div class="photo__grid">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button"
+             aria-label="Choose a photo of a component, or drop one here">
+          <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
+          <img id="photo-preview" alt="" hidden>
+          <div class="dropzone__prompt" id="dropzone-prompt">
+            <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            <strong>Drop a photo, or click to choose</strong>
+            <span>You can also paste one with <kbd>Ctrl</kbd>+<kbd>V</kbd>. Get the
+                  markings on the package in focus — that is what the model reads.</span>
+          </div>
+        </div>
+
+        <div class="photo__side">
+          <label class="photo__label" for="photo-note">Hint <span>optional</span></label>
+          <input id="photo-note" type="text" maxlength="200"
+                 placeholder="e.g. pulled from a 5&nbsp;V motor driver board">
+          <p class="hint">Anything you already know — where it came from, the board it
+             sat on — helps the model choose between look-alike packages.</p>
+          <div class="photo__actions">
+            <button type="button" class="btn btn--primary" id="identify-btn" disabled>
+              <span class="btn__label">Identify component</span>
+              <span class="spinner" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn--ghost" id="photo-clear" hidden>Clear</button>
+          </div>
+          <p class="photo__timing" id="photo-timing" hidden></p>
+        </div>
+      </div>
+
+      <div class="photo__out" id="photo-out"></div>
+    </div>
+
+    <div class="categories" id="category-panel" hidden>
+      <div class="categories__head">
+        <div class="categories__headline">
+          <h2>Component categories</h2>
+          <div class="input-wrap input-wrap--sm categories__find">
+            <svg class="input-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 1 1-4.9 13.2l-3.3 3.3a1 1 0 0 1-1.4-1.4l3.3-3.3A7.5 7.5 0 0 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z" fill="currentColor"/></svg>
+            <label class="sr-only" for="category-filter">Filter categories</label>
+            <input id="category-filter" type="search" placeholder="Find a category — capacitor, relay, crystal…">
+          </div>
+        </div>
+        <p id="category-count">Pick a category to search it across every supplier.</p>
+      </div>
+      <div class="categories__grid" id="category-grid"></div>
+    </div>
+  </section>
+
+  <div class="crumb" id="crumb" hidden></div>
+
+  <section class="sources" id="sources" aria-label="Data source status" hidden></section>
+
+  <section class="stats" id="stats" aria-label="Result summary" hidden></section>
+
+  <section class="toolbar" id="toolbar" hidden>
+    <div class="toolbar__group toolbar__group--grow">
+      <label class="sr-only" for="filter">Filter results</label>
+      <div class="input-wrap input-wrap--sm">
+        <svg class="input-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5z" fill="currentColor"/></svg>
+        <input id="filter" type="search" placeholder="Filter these results — supplier, manufacturer, package…">
+      </div>
+    </div>
+    <div class="toolbar__group">
+      <label class="switch">
+        <input type="checkbox" id="only-stock"><span class="switch__ui" aria-hidden="true"></span>
+        <span>In stock only</span>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="only-fulfillable"><span class="switch__ui" aria-hidden="true"></span>
+        <span>Meets required stock</span>
+      </label>
+    </div>
+    <div class="toolbar__group">
+      <label class="sr-only" for="sort">Sort by</label>
+      <select id="sort" class="select-sm"></select>
+      <div class="segmented" role="group" aria-label="Result layout">
+        <button type="button" class="segmented__btn is-active" data-view="flat">All offers</button>
+        <button type="button" class="segmented__btn" data-view="grouped">By part</button>
+      </div>
+      <button type="button" class="btn btn--ghost" id="refresh-btn" title="Bypass cache and re-query every source">Refresh</button>
+      <button type="button" class="btn btn--ghost" id="export-btn" title="Download the current table as CSV">Export CSV</button>
+    </div>
+  </section>
+
+  <section id="results-region" class="results" aria-live="polite" aria-busy="false">
+    <div class="placeholder" id="placeholder">
+      <div class="placeholder__art" aria-hidden="true">
+        <svg viewBox="0 0 120 80" width="140" height="94">
+          <rect x="14" y="14" width="92" height="52" rx="6" fill="none" stroke="currentColor" stroke-width="2" opacity=".5"/>
+          <path d="M14 30h92M42 14v52M74 14v52" stroke="currentColor" stroke-width="1.4" opacity=".28"/>
+          <circle cx="28" cy="22" r="3" fill="currentColor" opacity=".55"/>
+          <circle cx="58" cy="48" r="3" fill="currentColor" opacity=".4"/>
+          <circle cx="90" cy="48" r="3" fill="currentColor" opacity=".4"/>
+        </svg>
+      </div>
+      <h2>Search a component to compare suppliers</h2>
+      <p>Enter a manufacturer part number, a category like <em>Artix-7 FPGA</em>, or a plain
+         description. Every configured distributor is queried at once and merged into a single
+         price and availability table.</p>
+    </div>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="assertive"></div>
+
+<div class="drawer" id="drawer" hidden>
+  <div class="drawer__scrim" data-close-drawer></div>
+  <aside class="drawer__panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+    <header class="drawer__head">
+      <h2 id="drawer-title">Data sources</h2>
+      <button type="button" class="icon-btn" data-close-drawer aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="drawer__body" id="drawer-body"></div>
+    <footer class="drawer__foot">
+      <p>Add API keys to <code>.env</code> in the project root, then restart the server.
+         See <code>README.md</code> for where each free key comes from.</p>
+    </footer>
+  </aside>
+</div>
+
+<footer class="sitefoot">
+  <p>Prices and stock come straight from each distributor at query time. Availability changes
+     minute to minute — always confirm on the supplier page before you commit a build.</p>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
