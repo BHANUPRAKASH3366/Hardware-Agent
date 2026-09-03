@@ -21,25 +21,6 @@ python app.py
 Then open <http://127.0.0.1:8080> (it opens automatically). On Windows you can
 also double-click `run.bat`; on macOS/Linux use `./run.sh`.
 
-### Why the same file used to total differently
-
-Uploading one BOM twice could give two different totals. Three things combined
-to cause it, and all three are fixed:
-
-- A rate-limited supplier dropped out of a line, so whoever *did* answer became
-  that line's winner. Which suppliers got throttled varied run to run, so the
-  chosen supplier — and the price — varied with it.
-- Those incomplete results were cached as though complete, freezing a missing
-  supplier in for the life of the entry.
-- The cache expired after 60 seconds, less than a long BOM takes to run, so a
-  repeat upload re-queried everything and rolled the dice again.
-
-Now only a complete answer is cached, the cache holds long enough for a repeat
-run to reuse it, and a second pass re-prices any line a supplier failed on —
-by then the rate limit has cleared, so the retry usually gets it. Lines that
-stay incomplete say so rather than quietly picking a winner from whoever
-answered.
-
 ## Watching the API quota
 
 Every search costs one call per supplier, and a BOM costs one per line per
@@ -142,7 +123,7 @@ needs.
 ## Category search
 
 The agent knows a component category tree of **988 categories in 67 groups**,
-covering roughly 12.5 million distributor line items.
+covering roughly 12.7 million distributor line items.
 
 It comes from two places. A hand-written tree goes **deep** on the
 semiconductor taxonomy: amplifiers down to the leaf level (op amps,
@@ -214,7 +195,6 @@ like `llama3` cannot:
 ```
 ollama pull qwen2.5vl:3b     # best at reading small printed markings, ~3 GB
 ollama pull moondream        # smallest, ~1.7 GB, weaker at text
-ollama pull llava:7b         # ~4.7 GB
 ```
 
 That is all. The agent probes Ollama at start-up, picks the best installed
